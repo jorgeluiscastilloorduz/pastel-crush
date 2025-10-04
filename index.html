@@ -161,9 +161,12 @@
         <div class="pill">Nivel <span id="level">1</span></div>
         <div class="pill big">Puntaje: <span id="score" class="accent">0</span> / <span id="target">200</span></div>
         <div class="pill" title="Vidas"><span id="lives">❤️❤️❤️</span></div>
-        <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:wrap;">
+        <div class="hud-actions">
           <div class="pill" title="Tiempo restante">⏱️ <span id="time">45</span>s</div>
-          <button id="restart">Reiniciar</button>
+          <button id="restart" type="button">
+            <span aria-hidden="true">🔄</span>
+            <span>Reiniciar</span>
+          </button>
         </div>
       </div>
 
