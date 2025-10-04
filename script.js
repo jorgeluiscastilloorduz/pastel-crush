@@ -27,11 +27,17 @@
       el.classList.add('active');
       hideOverlay();
       if(el===screens.title) renderHistory();
+      if(el===screens.game){ requestAnimationFrame(()=> updateTileMetrics(true)); }
       renderChips();
     }
     // Exponer helpers globales
     window.pcTo = function(name){ if(screens[name]) showScreen(screens[name]); };
-    window.pcStart = function(level){ level = (typeof level==='number')? level : 0; showScreen(screens.game); try{ initLevel(level); }catch(e){ console.warn('pcStart init error', e); } };
+    function beginLevel(index){ try{ updateTileMetrics(true); initLevel(index); }catch(e){ console.warn('pcStart init error', e); } }
+    window.pcStart = function(level){
+      level = (typeof level==='number')? level : 0;
+      showScreen(screens.game);
+      requestAnimationFrame(()=> beginLevel(level));
+    };
 
     // Botones navegación
     const btnPlay = $('btnPlay'), btnCustomize=$('btnCustomize');
@@ -132,9 +138,6 @@
 
     // DOM del juego
     const rootEl = document.documentElement;
-    const readMetric = (prop)=> parseFloat(getComputedStyle(rootEl).getPropertyValue(prop)) || 0;
-    let tilePx = readMetric('--tile');
-    let gap = readMetric('--gap');
     const size = 8;
     const boardEl = $('board');
     const gridBgEl = $('grid-bg');
@@ -156,6 +159,17 @@
     const modalActions = $('modalActions');
     const testLog = $('test-log');
 
+    const readCssNumber = (prop)=> {
+      const raw = getComputedStyle(rootEl).getPropertyValue(prop).trim();
+      const num = parseFloat(raw);
+      return Number.isNaN(num) ? NaN : num;
+    };
+
+    let tilePx = readCssNumber('--tile');
+    if(!Number.isFinite(tilePx)) tilePx = 54;
+    let gap = readCssNumber('--gap');
+    if(!Number.isFinite(gap)) gap = 6;
+
     function refreshTilePositions(){
       if(!boardEl) return;
       boardEl.querySelectorAll('.tile').forEach(el=>{
@@ -165,16 +179,22 @@
         el.style.top = px(r * tilePx + gap / 2);
       });
     }
-    function updateTileMetrics(){
-      const newTile = readMetric('--tile');
-      const newGap = readMetric('--gap');
-      const changed = Math.abs(newTile - tilePx) > 0.5 || Math.abs(newGap - gap) > 0.5;
+    function updateTileMetrics(force){
+      const cssTile = readCssNumber('--tile');
+      const cssGap = readCssNumber('--gap');
+      const boardRect = boardEl ? boardEl.getBoundingClientRect() : null;
+      const fallbackTile = boardRect && boardRect.width ? boardRect.width / size : NaN;
+      const boardStyles = boardEl ? getComputedStyle(boardEl) : null;
+      const fallbackGap = boardStyles ? parseFloat(boardStyles.paddingLeft) : NaN;
+      const newTile = Number.isFinite(cssTile) ? cssTile : (Number.isFinite(fallbackTile) ? fallbackTile : tilePx);
+      const newGap = Number.isFinite(cssGap) ? cssGap : (Number.isFinite(fallbackGap) ? fallbackGap : gap);
+      const changed = force || Math.abs(newTile - tilePx) > 0.5 || Math.abs(newGap - gap) > 0.5;
       tilePx = newTile;
       gap = newGap;
       if(changed) refreshTilePositions();
     }
     window.addEventListener('resize', updateTileMetrics);
-    updateTileMetrics();
+    updateTileMetrics(true);
 
     // Fondo de grilla visual (una vez)
     if(gridBgEl){ gridBgEl.innerHTML=''; for(let i=0;i<size*size;i++) gridBgEl.appendChild(document.createElement('div')); }
@@ -261,13 +281,13 @@
 
     function shuffleBoard(){ const items=[]; for(let r=0;r<size;r++) for(let c=0;c<size;c++){ const t=board[r][c]; if(t){ items.push(t); } } const positions=[]; for(let r=0;r<size;r++) for(let c=0;c<size;c++) positions.push({r,c}); for(let i=positions.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [positions[i],positions[j]]=[positions[j],positions[i]]; } items.forEach((t,i)=>{ const {r,c}=positions[i]; board[t.row][t.col]=null; board[r][c]=t; t.row=r; t.col=c; moveTileEl(t.el,r,c); t.el.dataset.row=r; t.el.dataset.col=c; }); setTimeout(()=>{ const m=findAllMatches(); if(m.length){ comboChain=0; resolveMatches(m); } }, 350); }
 
-    function showWinModal(){ modalActions.innerHTML=''; const isLast=levelIndex>=LEVELS.length-1; modalIcon.textContent=isLast ? '♾️' : '🎉'; modalTitle.textContent=isLast ? '¡Modo infinito desbloqueado!' : '¡Ganaste!'; modalText.textContent=isLast ? 'Has completado los 10 niveles. Continúa jugando sin límite de tiempo.' : 'Has alcanzado la meta del nivel.'; const primary=document.createElement('button'); primary.className='btn primary'; primary.innerHTML=isLast?('➡️ Modo infinito'):('➡️ Siguiente nivel'); primary.onclick=()=>{ overlay.classList.remove('show'); if(isLast){ startInfiniteMode(); } else { initLevel(levelIndex+1); } }; modalActions.appendChild(primary); overlay.classList.add('show'); }
-    function showLoseModal(){ modalIcon.textContent='💔'; modalTitle.textContent='¡Casi!'; modalText.textContent=`Te quedan ${lives} vida${lives===1?'':'s'}.`; modalActions.innerHTML=''; const retry=document.createElement('button'); retry.className='btn primary'; retry.innerHTML='🔄 Volver a intentar'; retry.onclick=()=>{ overlay.classList.remove('show'); initLevel(levelIndex); }; modalActions.appendChild(retry); overlay.classList.add('show'); }
-    function showGameOverModal(){ modalIcon.textContent='🛑'; modalTitle.textContent='Juego terminado'; modalText.textContent='Te has quedado sin vidas. ¿Reiniciamos?'; modalActions.innerHTML=''; const restart=document.createElement('button'); restart.className='btn primary'; restart.innerHTML='🔄 Reiniciar'; restart.onclick=()=>{ overlay.classList.remove('show'); lives=3; renderLives(); initLevel(0); }; modalActions.appendChild(restart); overlay.classList.add('show'); }
+    function showWinModal(){ modalActions.innerHTML=''; const isLast=levelIndex>=LEVELS.length-1; modalIcon.textContent=isLast ? '♾️' : '🎉'; modalTitle.textContent=isLast ? '¡Modo infinito desbloqueado!' : '¡Ganaste!'; modalText.textContent=isLast ? 'Has completado los 10 niveles. Continúa jugando sin límite de tiempo.' : 'Has alcanzado la meta del nivel.'; const primary=document.createElement('button'); primary.className='btn primary'; primary.innerHTML=isLast?('➡️ Modo infinito'):('➡️ Siguiente nivel'); primary.onclick=()=>{ overlay.classList.remove('show'); if(isLast){ startInfiniteMode(); } else { beginLevel(levelIndex+1); } }; modalActions.appendChild(primary); overlay.classList.add('show'); }
+    function showLoseModal(){ modalIcon.textContent='💔'; modalTitle.textContent='¡Casi!'; modalText.textContent=`Te quedan ${lives} vida${lives===1?'':'s'}.`; modalActions.innerHTML=''; const retry=document.createElement('button'); retry.className='btn primary'; retry.innerHTML='🔄 Volver a intentar'; retry.onclick=()=>{ overlay.classList.remove('show'); beginLevel(levelIndex); }; modalActions.appendChild(retry); overlay.classList.add('show'); }
+    function showGameOverModal(){ modalIcon.textContent='🛑'; modalTitle.textContent='Juego terminado'; modalText.textContent='Te has quedado sin vidas. ¿Reiniciamos?'; modalActions.innerHTML=''; const restart=document.createElement('button'); restart.className='btn primary'; restart.innerHTML='🔄 Reiniciar'; restart.onclick=()=>{ overlay.classList.remove('show'); lives=3; renderLives(); beginLevel(0); }; modalActions.appendChild(restart); overlay.classList.add('show'); }
     function renderLives(){ const full='❤️'.repeat(lives); const empty='🤍'.repeat(Math.max(0,3-lives)); if(livesEl) livesEl.textContent=full+empty; }
     function startInfiniteMode(){ infiniteMode=true; stopTimer(); if(levelEl) levelEl.textContent='∞'; if(targetEl) targetEl.textContent='∞'; if(timeEl) timeEl.textContent='∞'; }
 
-    if(restartBtn) restartBtn.addEventListener('click', ()=>{ lives=3; infiniteMode=false; renderLives(); initLevel(0); });
+    if(restartBtn) restartBtn.addEventListener('click', ()=>{ lives=3; infiniteMode=false; renderLives(); beginLevel(0); });
 
     function emitParticles(tileEl, color){ const rect=tileEl.getBoundingClientRect(); const parentRect=boardEl.getBoundingClientRect(); const x=rect.left-parentRect.left+rect.width/2; const y=rect.top-parentRect.top+rect.height/2; const count=10; for(let i=0;i<count;i++){ const p=document.createElement('div'); p.className='particle'; p.style.background=color||'#ddd'; const angle=Math.random()*Math.PI*2; const dist=14+Math.random()*18; const tx=Math.cos(angle)*dist; const ty=Math.sin(angle)*dist; p.style.left=px(x); p.style.top=px(y); p.style.setProperty('--tx', tx+'px'); p.style.setProperty('--ty', ty+'px'); boardEl.appendChild(p); setTimeout(()=> p.remove(), 650); } }
 
