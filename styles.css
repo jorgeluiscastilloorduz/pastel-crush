@@ -669,6 +669,7 @@ body {
 
   .center-col {
     gap: 16px;
+    width: 100%;
   }
 
   .history {
@@ -685,6 +686,38 @@ body {
 
   .hud {
     padding: 12px;
+  }
+
+  .builder-controls {
+    padding: 14px;
+  }
+
+  .row {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .row label {
+    flex: 1 0 100%;
+    margin-bottom: 6px;
+  }
+
+  .row select,
+  .row input[type="text"] {
+    width: 100%;
+  }
+
+  .row input[type="color"] {
+    margin-left: auto;
+  }
+
+  .builder-controls .row:last-child {
+    justify-content: center;
+  }
+
+  .builder-controls .row:last-child .cta {
+    flex: 1 1 140px;
+    min-width: 140px;
   }
 }
 
